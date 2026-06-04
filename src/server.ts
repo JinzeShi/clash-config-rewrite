@@ -180,6 +180,21 @@ function readProfileFile(profileName: string, fileType: FileType): { name: strin
   };
 }
 
+function writeProfileFile(profileName: string, fileType: FileType, content: string): void {
+  const appConfig = readAppConfig();
+  const profile = appConfig.profiles.find((item) => item.name === profileName);
+
+  if (!profile) {
+    throw new TypeError(`Profile "${profileName}" does not exist.`);
+  }
+
+  if (fileType !== 'origin') {
+    throw new TypeError('Only origin files can be edited.');
+  }
+  
+  fs.writeFileSync(path.resolve(PROJECT_ROOT, appConfig.originDir, profile.originFile), content, 'utf8');
+}
+
 function findOutputFile(appConfig: AppConfig, outputFileName: string): { name: string; type: FileType } {
   for (const profile of appConfig.profiles) {
     if (profile.outputFile === outputFileName) {
@@ -267,7 +282,16 @@ async function handleApi(req: IncomingMessage, res: ServerResponse, url: URL): P
     sendJson(res, 200, readProfileFile(name, type));
     return;
   }
-
+  if (req.method === 'PUT' && url.pathname === '/api/file') {
+    const body = JSON.parse(await readRequestBody(req)) as { name?: string; type?: string; content?: string };
+    const name = body.name || '';
+    const type = assertFileType(body.type || '');
+    const content = String(body.content ?? '');
+    console.log(`File "${type}" for profile "${name}" saving.`);
+    writeProfileFile(name, type, content);
+    sendJson(res, 200, { ok: true });
+    return;
+  }
   if (req.method === 'POST' && url.pathname === '/api/run') {
     console.log('Rewrite process requested.');
     await runRewrite();

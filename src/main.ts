@@ -83,6 +83,21 @@ export function readYamlFile(filePath: string): JsonValue {
 }
 
 export function readRawAppConfig(): RawAppConfig {
+  if (!fs.existsSync(CONFIG_FILE_PATH)) {
+    const defaultConfig = {
+      originDir: 'origin',
+      outputDir: 'output',
+      profiles: [{
+        name: 'Example',
+        originFile: 'Example.yaml',
+        outputFile: 'Example_Output.yaml',
+        rewriteOutputFile: 'Example_Rewrite.yaml',
+      }],
+    };
+    fs.mkdirSync(path.dirname(CONFIG_FILE_PATH), { recursive: true });
+    fs.writeFileSync(CONFIG_FILE_PATH, yaml.dump(defaultConfig, { lineWidth: -1, noRefs: true }), 'utf8');
+  }
+
   const data = readYamlFile(CONFIG_FILE_PATH);
 
   if (!data || typeof data !== 'object' || Array.isArray(data)) {
@@ -110,6 +125,10 @@ export function readAppConfig(): AppConfig {
 }
 
 export function readRewriteFile(): string {
+  if (!fs.existsSync(REWRITE_FILE_PATH)) {
+    fs.mkdirSync(path.dirname(REWRITE_FILE_PATH), { recursive: true });
+    fs.writeFileSync(REWRITE_FILE_PATH, 'function main(config, profileName) {\n  return config;\n}\n', 'utf8');
+  }
   return fs.readFileSync(REWRITE_FILE_PATH, 'utf8');
 }
 
@@ -183,7 +202,7 @@ function clearDirectory(dirPath: string): void {
 }
 
 function loadRewrite(): RewriteFunction {
-  const code = fs.readFileSync(REWRITE_FILE_PATH, 'utf8');
+  const code = readRewriteFile();
   const sandbox: Context = {
     console,
   };
@@ -226,7 +245,8 @@ export async function runRewrite(): Promise<RewriteResult[]> {
     }
 
     const configJson = readYamlFile(originFilePath);
-    const rewriteConfig = await rewrite(configJson, profileName);
+    const rewriteInput = JSON.parse(JSON.stringify(configJson)) as JsonValue;
+    const rewriteConfig = await rewrite(rewriteInput, profileName);
 
     dumpYamlFile(outputFilePath, configJson);
     dumpYamlFile(rewriteOutputFilePath, rewriteConfig);

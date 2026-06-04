@@ -22,6 +22,8 @@ const els = {
   configView: document.querySelector('#configView'),
   rewriteView: document.querySelector('#rewriteView'),
   filesView: document.querySelector('#filesView'),
+  previewEditor: document.querySelector('#previewEditor'),
+  saveFileButton: document.querySelector('#saveFileButton'),
   navButtons: [...document.querySelectorAll('.nav-button')],
   profileList: document.querySelector('#profileList'),
   previewSummary: document.querySelector('#previewSummary'),
@@ -246,6 +248,7 @@ function renderTabs() {
   for (const button of els.tabButtons) {
     button.classList.toggle('active', button.dataset.preview === selectedFileType);
   }
+  els.saveFileButton.hidden = selectedFileType !== FILE_TYPES.ORIGIN;
 }
 
 async function loadFiles() {
@@ -277,7 +280,14 @@ async function loadSelectedFile() {
   els.previewSummary.textContent = file.name;
   els.previewTitle.textContent = file.type[0].toUpperCase() + file.type.slice(1);
   els.previewName.textContent = file.fileName;
-  els.previewContent.textContent = file.content;
+  const isOrigin = file.type === FILE_TYPES.ORIGIN;
+  els.previewContent.hidden = isOrigin;
+  els.previewEditor.hidden = !isOrigin;
+  if (isOrigin) {
+    els.previewEditor.value = file.content;
+  } else {
+    els.previewContent.textContent = file.content;
+  }
   setStatus('Ready');
 }
 
@@ -318,6 +328,16 @@ async function copyText(text) {
   textarea.remove();
 }
 
+
+async function saveOriginFile() {
+  setStatus('Saving origin file');
+  await requestJson('/api/file', {
+    method: 'PUT',
+    body: JSON.stringify({ name: selectedProfileName, type: FILE_TYPES.ORIGIN, content: els.previewEditor.value }),
+  });
+  setStatus('Ready');
+  notify('Origin file saved');
+}
 function bindEvents() {
   for (const button of els.navButtons) {
     button.addEventListener('click', () => {
@@ -351,9 +371,12 @@ function bindEvents() {
       .catch((error) => notify(error.message, 'error'));
   });
   els.copyPreviewButton.addEventListener('click', () => {
-    copyText(els.previewContent.textContent)
+    copyText(selectedFileType === FILE_TYPES.ORIGIN ? els.previewEditor.value : els.previewContent.textContent)
       .then(() => notify('Preview copied'))
       .catch((error) => notify(error.message, 'error'));
+  });
+  els.saveFileButton.addEventListener('click', () => {
+    saveOriginFile().catch((error) => notify(error.message, 'error'));
   });
 }
 

@@ -32,7 +32,7 @@
             <div class="view-header">
               <div>
                 <h2>Config</h2>
-                <p>Output filenames remain editable; directory paths are fixed at startup.</p>
+                <p>Edit profile settings.</p>
               </div>
               <div class="button-row">
                 <button id="copyConfigButton" type="button">Copy Config</button>
@@ -59,8 +59,8 @@
 
               <div class="mapping-table">
                 <div class="mapping-header">
-                  <span>Profile Name</span>
-                  <span>Origin File</span>
+                  <span>Profile Name<sup>*</sup></span>
+                  <span>Origin File<sup>*</sup></span>
                   <span>Output File</span>
                   <span>Rewrite Output File</span>
                   <span></span>
@@ -115,8 +115,10 @@
                   <div class="panel-title">
                     <span id="previewTitle">Origin</span>
                     <span id="previewName"></span>
+                    <button id="saveFileButton" class="primary-button" type="button" hidden>Save File</button>
                   </div>
                   <pre id="previewContent"></pre>
+                  <textarea id="previewEditor" spellcheck="false" hidden></textarea>
                 </div>
               </section>
             </div>

@@ -1,10 +1,9 @@
 .git
 .DS_Store
 .vscode
-
 node_modules
 dist
-configs/config.yaml
-configs/rewrite.js
+
+configs
 origin
 output
