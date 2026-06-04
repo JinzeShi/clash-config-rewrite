@@ -1,0 +1,11 @@
+services:
+  clash-rewrite:
+    build: .
+    container_name: clash-rewrite
+    ports:
+      - 13000:13000
+    volumes:
+      - ./configs:/app/configs
+      - ./origin:/app/origin
+      - ./output:/app/output
+    restart: unless-stopped

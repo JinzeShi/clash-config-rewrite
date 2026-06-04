@@ -13,7 +13,7 @@ import {
 } from './main';
 
 const PROJECT_ROOT = path.resolve(__dirname, '..');
-const HOST = '127.0.0.1';
+const HOST = '0.0.0.0';
 const PORT = 13000;
 const PUBLIC_DIR = path.join(PROJECT_ROOT, 'public');
 const CONFIG_FILE_PATH = path.join(PROJECT_ROOT, 'configs', 'config.yaml');
