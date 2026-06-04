@@ -1,0 +1,7 @@
+originDir: origin
+outputDir: output
+profiles:
+  - name: Example
+    originFile: Example.yaml
+    outputFile: Example_Output.yaml
+    rewriteOutputFile: Example_Rewrite.yaml

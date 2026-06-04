@@ -1,0 +1,130 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Clash Rewrite</title>
+    <link rel="stylesheet" href="/styles.css">
+  </head>
+  <body>
+    <div id="toast" class="toast" hidden></div>
+    <main class="app-shell">
+      <header class="topbar">
+        <div>
+          <h1>Clash Rewrite</h1>
+          <p id="statusText">Ready</p>
+        </div>
+        <button id="runButton" class="primary-button" type="button">Run Rewrite</button>
+      </header>
+
+      <section class="workspace">
+        <aside class="sidebar">
+          <div class="sidebar-header">Menu</div>
+          <nav class="primary-nav">
+            <button class="nav-button active" type="button" data-view="config">Config</button>
+            <button class="nav-button" type="button" data-view="rewrite">Rewrite</button>
+            <button class="nav-button" type="button" data-view="files">Files</button>
+          </nav>
+        </aside>
+
+        <section class="content-area">
+          <section id="configView" class="view-panel">
+            <div class="view-header">
+              <div>
+                <h2>Config</h2>
+                <p>Output filenames remain editable; directory paths are fixed at startup.</p>
+              </div>
+              <div class="button-row">
+                <button id="copyConfigButton" type="button">Copy Config</button>
+                <button id="saveConfigButton" class="primary-button" type="button">Save Config</button>
+              </div>
+            </div>
+
+            <section class="config-panel">
+              <div class="path-grid">
+                <label>
+                  <span>Origin Dir</span>
+                  <input id="originDirInput" type="text" readonly>
+                </label>
+                <label>
+                  <span>Output Dir</span>
+                  <input id="outputDirInput" type="text" readonly>
+                </label>
+              </div>
+
+              <div class="config-toolbar">
+                <span>Profiles</span>
+                <button id="addConfigRowButton" type="button">Add Row</button>
+              </div>
+
+              <div class="mapping-table">
+                <div class="mapping-header">
+                  <span>Profile Name</span>
+                  <span>Origin File</span>
+                  <span>Output File</span>
+                  <span>Rewrite Output File</span>
+                  <span></span>
+                </div>
+                <div id="configRows"></div>
+              </div>
+            </section>
+          </section>
+
+          <section id="rewriteView" class="view-panel" hidden>
+            <div class="view-header">
+              <div>
+                <h2>Rewrite</h2>
+                <p>Edit rewrite.js.</p>
+              </div>
+              <div class="button-row">
+                <button id="copyRewriteButton" type="button">Copy</button>
+                <button id="saveRewriteButton" class="primary-button" type="button">Save Rewrite</button>
+              </div>
+            </div>
+
+            <section class="editor-panel">
+              <div class="panel-title">
+                <span>rewrite.js</span>
+              </div>
+              <textarea id="rewriteEditor" spellcheck="false"></textarea>
+            </section>
+          </section>
+
+          <section id="filesView" class="view-panel" hidden>
+            <div class="view-header">
+              <div>
+                <h2>Files</h2>
+                <p id="previewSummary"></p>
+              </div>
+              <button id="copyPreviewButton" type="button">Copy Preview</button>
+            </div>
+
+            <div class="compare-layout">
+              <section class="profile-panel">
+                <div class="sidebar-header">Profiles</div>
+                <div id="profileList" class="profile-list"></div>
+              </section>
+
+              <section class="compare-panel">
+                <div class="preview-tabs">
+                  <button class="tab-button active" type="button" data-preview="origin">Origin</button>
+                  <button class="tab-button" type="button" data-preview="output">Output</button>
+                  <button class="tab-button" type="button" data-preview="rewrite">Rewrite</button>
+                </div>
+                <div class="file-panel">
+                  <div class="panel-title">
+                    <span id="previewTitle">Origin</span>
+                    <span id="previewName"></span>
+                  </div>
+                  <pre id="previewContent"></pre>
+                </div>
+              </section>
+            </div>
+          </section>
+        </section>
+      </section>
+    </main>
+
+    <script src="/app.js"></script>
+  </body>
+</html>
