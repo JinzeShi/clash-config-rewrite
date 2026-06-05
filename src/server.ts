@@ -51,7 +51,8 @@ function sendText(
 function sendFile(res: ServerResponse, statusCode: number, content: string | Buffer, fileName: string): void {
   res.writeHead(statusCode, {
     'Content-Type': 'text/plain; charset=utf-8',
-    'Content-Disposition': `attachment; filename="${fileName}"`,
+    'Content-Disposition': `attachment; filename="${fileName}"; filename*=utf-8''${encodeURIComponent(fileName)}`,
+    'profile-update-interval': '24',
     'Content-Length': Buffer.byteLength(content),
   });
   res.end(content);
@@ -240,7 +241,7 @@ function serveStatic(res: ServerResponse, pathname: string): void {
   const filePath = path.resolve(PUBLIC_DIR, relativePath);
 
   if (!filePath.startsWith(PUBLIC_DIR) || !fs.existsSync(filePath) || fs.statSync(filePath).isDirectory()) {
-    sendJson(res, 404, { error: 'Not found' });
+    sendText(res, 404, 'Not found');
     return;
   }
 
@@ -282,6 +283,7 @@ async function handleApi(req: IncomingMessage, res: ServerResponse, url: URL): P
     sendJson(res, 200, readProfileFile(name, type));
     return;
   }
+
   if (req.method === 'PUT' && url.pathname === '/api/file') {
     const body = JSON.parse(await readRequestBody(req)) as { name?: string; type?: string; content?: string };
     const name = body.name || '';
@@ -292,6 +294,7 @@ async function handleApi(req: IncomingMessage, res: ServerResponse, url: URL): P
     sendJson(res, 200, { ok: true });
     return;
   }
+
   if (req.method === 'POST' && url.pathname === '/api/run') {
     console.log('Rewrite process requested.');
     await runRewrite();
@@ -299,42 +302,45 @@ async function handleApi(req: IncomingMessage, res: ServerResponse, url: URL): P
     return;
   }
 
-  sendJson(res, 404, { error: 'Not found' });
-}
-
-async function handleProfileFileRequest(req: IncomingMessage, res: ServerResponse, url: URL): Promise<void> {  
-  if (req.method === 'GET' && url.pathname === '/profiles/file') {
-    const name = url.searchParams.get('name') || '';
-    console.log(`Profile "${name}" requested.`);
+  if (req.method === 'GET' && url.pathname === '/api/profiles') {
+    const filename = url.searchParams.get('filename') || '';
+    if (!filename) {
+      console.log('Profile file requested without filename.');
+      sendText(res, 404, 'Not found');
+      return;
+    }
+    console.log(`Profile "${filename}" requested.`);
     try {
-      const fileData = getOutputFile(name);
+      const fileData = getOutputFile(filename);
       sendFile(res, 200, fileData.content, toCapitalizeCase(fileData.name) + '_' + toCapitalizeCase(fileData.type) + '.yaml');
-    } catch (error) {
-      sendJson(res, 404, { error: `Not found` });
+    } catch (error: unknown) {
+      if (error instanceof TypeError) {
+        console.warn('Profile file not found: ', error.message);
+        sendText(res, 404, 'Not found');
+        return;
+      }
+      throw error;
     }
     return;
   }
 
-  sendJson(res, 404, { error: 'Not found' });
+  sendText(res, 404, 'Not found');
 }
 
 const server = http.createServer(async (req, res) => {
   const url = new URL(req.url || '/', `http://${req.headers.host || `${HOST}:${PORT}`}`);
-  console.log(`API request: ${req.method} ${url.pathname}`);
+  console.log(`API request: ${req.method} ${url.pathname}${url.search}`);
 
   try {
     if (url.pathname.startsWith('/api/')) {
       await handleApi(req, res, url);
-    } else if (url.pathname.startsWith('/profiles/')) {
-      await handleProfileFileRequest(req, res, url);
     } else {
       serveStatic(res, url.pathname);
     }
   } catch (error: unknown) {
-    const typedError = error instanceof Error ? error : new Error(String(error));
-    sendJson(res, 500, {
-      error: typedError instanceof TypeError ? typedError.message : 'Internal server error',
-    });
+    const err = error instanceof Error ? error : new Error(String(error));
+    console.error('Error handling request: ', err);
+    sendText(res, 500, 'Internal server error');
   }
   console.log(`API response: ${res.statusCode}`);
 });
