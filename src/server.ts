@@ -237,7 +237,8 @@ function getContentType(filePath: string): string {
 }
 
 function serveStatic(res: ServerResponse, pathname: string): void {
-  const relativePath = pathname === '/' ? 'index.html' : pathname.replace(/^\/+/, '');
+  const isAppRoute = pathname === "/" || pathname === "/config" || pathname === "/rewrite" || pathname === "/files";
+  const relativePath = isAppRoute ? "index.html" : pathname.replace(/^\/+/, "");
   const filePath = path.resolve(PUBLIC_DIR, relativePath);
 
   if (!filePath.startsWith(PUBLIC_DIR) || !fs.existsSync(filePath) || fs.statSync(filePath).isDirectory()) {

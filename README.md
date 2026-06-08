@@ -45,6 +45,20 @@ function main(config, profileName) {
 
 `config` is the parsed YAML object. Return the modified config object.
 
+## Profile API
+
+Fetch a profile by filename (only output and rewritten profiles are accessible).
+
+```http
+GET /api/profiles?filename={filename}
+```
+
+Example:
+
+```http
+GET /api/profiles?filename=Example_Output.yaml
+```
+
 ## Local Usage
 
 Install dependencies:

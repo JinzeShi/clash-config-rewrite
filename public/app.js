@@ -15,6 +15,13 @@ let selectedProfileName = '';
 let selectedFileType = FILE_TYPES.ORIGIN;
 let configCache = null;
 
+function getViewFromPath() {
+  const p = window.location.pathname;
+  if (p === "/files") return VIEWS.FILES;
+  if (p === "/rewrite") return VIEWS.REWRITE;
+  return VIEWS.CONFIG;
+}
+
 const els = {
   toast: document.querySelector('#toast'),
   statusText: document.querySelector('#statusText'),
@@ -41,6 +48,7 @@ const els = {
   saveRewriteButton: document.querySelector('#saveRewriteButton'),
   copyRewriteButton: document.querySelector('#copyRewriteButton'),
   copyPreviewButton: document.querySelector('#copyPreviewButton'),
+  copyFileNameButton: document.querySelector('#copyFileNameButton'),
 };
 
 function setStatus(message) {
@@ -91,7 +99,13 @@ async function requestText(url, options = {}) {
   return text;
 }
 
-function showView(view) {
+function showView(view, pushState = true) {
+  if (pushState) {
+    const path = view === VIEWS.FILES ? "/files" : view === VIEWS.REWRITE ? "/rewrite" : "/config";
+    if (window.location.pathname !== path) {
+      window.history.pushState({ view }, "", path);
+    }
+  }
   currentView = view;
   els.configView.hidden = view !== VIEWS.CONFIG;
   els.rewriteView.hidden = view !== VIEWS.REWRITE;
@@ -207,7 +221,6 @@ async function saveConfig() {
     method: 'PUT',
     body: JSON.stringify(config),
   });
-  await loadConfig();
   notify('Config saved');
 }
 
@@ -221,7 +234,6 @@ async function saveRewrite() {
     method: 'PUT',
     body: JSON.stringify({ content: els.rewriteEditor.value }),
   });
-  await loadRewrite();
   notify('Rewrite saved');
 }
 
@@ -249,6 +261,7 @@ function renderTabs() {
     button.classList.toggle('active', button.dataset.preview === selectedFileType);
   }
   els.saveFileButton.hidden = selectedFileType !== FILE_TYPES.ORIGIN;
+  els.copyFileNameButton.hidden = selectedFileType === FILE_TYPES.ORIGIN;
 }
 
 async function loadFiles() {
@@ -328,7 +341,6 @@ async function copyText(text) {
   textarea.remove();
 }
 
-
 async function saveOriginFile() {
   setStatus('Saving origin file');
   await requestJson('/api/file', {
@@ -338,6 +350,12 @@ async function saveOriginFile() {
   setStatus('Ready');
   notify('Origin file saved');
 }
+
+window.addEventListener("popstate", (e) => {
+  const view = e.state?.view || getViewFromPath();
+  loadView(view).catch((error) => notify(error.message, "error"));
+});
+
 function bindEvents() {
   for (const button of els.navButtons) {
     button.addEventListener('click', () => {
@@ -375,10 +393,30 @@ function bindEvents() {
       .then(() => notify('Preview copied'))
       .catch((error) => notify(error.message, 'error'));
   });
+  els.copyFileNameButton.addEventListener('click', () => {
+    copyText(els.previewName.textContent)
+      .then(() => notify('File name copied'))
+      .catch((error) => notify(error.message, 'error'));
+  });
   els.saveFileButton.addEventListener('click', () => {
     saveOriginFile().catch((error) => notify(error.message, 'error'));
+  });
+
+  window.addEventListener('keydown', (e) => {
+    if ((e.ctrlKey || e.metaKey) && e.key === 's') {
+      e.preventDefault();
+      if (currentView === VIEWS.REWRITE && document.activeElement === els.rewriteEditor) {
+        saveRewrite().catch((error) => notify(error.message, 'error'));
+      } else if (currentView === VIEWS.FILES && selectedFileType === FILE_TYPES.ORIGIN && document.activeElement === els.previewEditor) {
+        saveOriginFile().catch((error) => notify(error.message, 'error'));
+      }
+    }
   });
 }
 
 bindEvents();
-loadView(currentView).catch((error) => notify(error.message, 'error'));
+const initialView = getViewFromPath();
+if (initialView !== currentView) {
+  showView(initialView, false);
+}
+loadView(initialView).catch((error) => notify(error.message, 'error'));
