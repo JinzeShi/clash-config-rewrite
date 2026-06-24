@@ -10,4 +10,4 @@ RUN npm ci && npm run build && npm prune --production
 
 EXPOSE 13000
 
-CMD ["node", "dist/server.js"]
+CMD ["node", "dist/app.js"]
