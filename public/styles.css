@@ -74,6 +74,10 @@ button:hover {
 
 button:focus,
 input:focus,
+textarea[readonly]:focus {
+  outline: none;
+}
+
 textarea:focus {
   outline: 2px solid var(--focus);
   outline-offset: 1px;
@@ -289,17 +293,19 @@ input[readonly] {
   font-weight: 650;
 }
 
-.config-toolbar,
 .mapping-header,
 .mapping-row {
   display: grid;
-  grid-template-columns: minmax(150px, 0.8fr) minmax(180px, 1fr) minmax(180px, 1fr) minmax(220px, 1fr) 84px;
+  grid-template-columns: minmax(150px, 0.8fr) minmax(180px, 1fr) minmax(200px, 1.2fr) minmax(120px, 0.8fr);
   gap: 10px;
   align-items: center;
 }
 
 .config-toolbar {
+  display: grid;
   grid-template-columns: 1fr auto;
+  gap: 10px;
+  align-items: center;
 }
 
 .config-toolbar span {
@@ -311,12 +317,6 @@ input[readonly] {
   display: grid;
   grid-template-rows: 34px minmax(0, 1fr);
   gap: 8px;
-}
-
-.mapping-header {
-  color: var(--muted);
-  font-size: 12px;
-  font-weight: 700;
 }
 
 #configRows {
@@ -345,6 +345,7 @@ input[readonly] {
   min-height: 0;
   display: grid;
   grid-template-columns: 260px minmax(0, 1fr);
+  grid-template-rows: minmax(0, 1fr);
   gap: 12px;
 }
 
@@ -361,7 +362,7 @@ input[readonly] {
   min-width: 0;
   min-height: 0;
   display: grid;
-  grid-template-rows: 44px minmax(0, 1fr);
+  grid-template-rows: 44px minmax(0, 1fr) auto;
   border: 1px solid var(--border);
   border-radius: 8px;
   background: var(--panel);
@@ -406,7 +407,8 @@ input[readonly] {
   font-weight: 700;
 }
 
-.panel-title span:last-child {
+#previewName {
+  flex: 1;
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -458,7 +460,6 @@ textarea {
   .editor-grid,
   .compare-layout,
   .path-grid,
-  .config-toolbar,
   .mapping-header,
   .mapping-row {
     grid-template-columns: 1fr;
@@ -480,8 +481,164 @@ textarea {
   .compare-panel {
     min-height: 420px;
   }
+}
 
-  .mapping-header span:last-child {
-    display: none;
-  }
+.subscription-info-bar {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 6px 12px;
+  border-bottom: 1px solid var(--border);
+  background: #eaf4f2;
+  font-size: 12px;
+  font-weight: 650;
+  color: var(--accent-strong);
+}
+
+.subscription-info-bar span::before {
+  content: attr(data-label);
+  margin-right: 4px;
+  color: var(--muted);
+  font-weight: 500;
+}
+
+.editor-area {
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: visible;
+}
+
+.editor-area pre,
+.editor-area textarea {
+  flex: 1;
+  min-height: 0;
+  height: 0;
+}
+
+.mapping-header span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.optional-col {
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 500;
+}
+
+.mapping-row .edit-button {
+  border-color: var(--accent);
+  color: var(--accent-strong);
+  font-weight: 650;
+}
+
+/* Modal */
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 30;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.35);
+}
+
+.modal-card {
+  width: min(580px, calc(100vw - 32px));
+  max-height: calc(100vh - 48px);
+  overflow-y: auto;
+  border-radius: 8px;
+  background: var(--panel);
+  box-shadow: 0 16px 48px rgba(20, 30, 40, 0.24);
+}
+
+.modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px 20px;
+  border-bottom: 1px solid var(--border);
+}
+
+.modal-header h3 {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 700;
+}
+
+.modal-header button {
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 0;
+  background: transparent;
+  font-size: 20px;
+  color: var(--muted);
+  cursor: pointer;
+}
+
+.modal-header button:hover {
+  color: var(--text);
+}
+
+.modal-body {
+  display: grid;
+  gap: 14px;
+  padding: 20px;
+}
+
+.modal-body label {
+  display: grid;
+  gap: 6px;
+}
+
+.modal-body label span {
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.modal-footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  padding: 14px 20px;
+  border-top: 1px solid var(--border);
+}
+
+.mapping-row span,
+.mapping-header span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.mapping-row .row-name {
+  font-weight: 650;
+}
+
+.mapping-row .row-origin,
+.mapping-row .row-output {
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.mapping-row .row-suburl {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.row-actions {
+  display: flex;
+  gap: 8px;
+  justify-content: flex-end;
 }

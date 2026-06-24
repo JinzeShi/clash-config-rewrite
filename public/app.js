@@ -15,11 +15,59 @@ let selectedProfileName = '';
 let selectedFileType = FILE_TYPES.ORIGIN;
 let configCache = null;
 
-function getViewFromPath() {
-  const p = window.location.pathname;
-  if (p === "/files") return VIEWS.FILES;
-  if (p === "/rewrite") return VIEWS.REWRITE;
-  return VIEWS.CONFIG;
+function isValidView(view) {
+  return Object.values(VIEWS).includes(view);
+}
+
+function isValidFileType(type) {
+  return Object.values(FILE_TYPES).includes(type);
+}
+
+function getStateFromUrl() {
+  const params = new URLSearchParams(window.location.search);
+  let view = params.get('view');
+
+  if (!view) {
+    const path = window.location.pathname;
+    if (path === '/files') {
+      view = VIEWS.FILES;
+    } else if (path === '/rewrite') {
+      view = VIEWS.REWRITE;
+    }
+  }
+
+  const type = params.get('type');
+
+  return {
+    view: isValidView(view) ? view : VIEWS.CONFIG,
+    profile: params.get('profile') || '',
+    type: isValidFileType(type) ? type : FILE_TYPES.ORIGIN,
+  };
+}
+
+function writeUrlState({ replace = false } = {}) {
+  const params = new URLSearchParams();
+  params.set('view', currentView);
+
+  if (currentView === VIEWS.FILES) {
+    if (selectedProfileName) {
+      params.set('profile', selectedProfileName);
+    }
+    params.set('type', selectedFileType);
+  }
+
+  const url = `${window.location.pathname === '/' ? '/' : '/'}?${params.toString()}`;
+  const state = { view: currentView, profile: selectedProfileName, type: selectedFileType };
+
+  if (`${window.location.pathname}${window.location.search}` === url) {
+    return;
+  }
+
+  if (replace) {
+    window.history.replaceState(state, '', url);
+  } else {
+    window.history.pushState(state, '', url);
+  }
 }
 
 const els = {
@@ -34,22 +82,44 @@ const els = {
   navButtons: [...document.querySelectorAll('.nav-button')],
   profileList: document.querySelector('#profileList'),
   previewSummary: document.querySelector('#previewSummary'),
-  previewTitle: document.querySelector('#previewTitle'),
   previewName: document.querySelector('#previewName'),
-  previewContent: document.querySelector('#previewContent'),
   tabButtons: [...document.querySelectorAll('.tab-button')],
   originDirInput: document.querySelector('#originDirInput'),
   outputDirInput: document.querySelector('#outputDirInput'),
   configRows: document.querySelector('#configRows'),
   addConfigRowButton: document.querySelector('#addConfigRowButton'),
   rewriteEditor: document.querySelector('#rewriteEditor'),
-  saveConfigButton: document.querySelector('#saveConfigButton'),
   copyConfigButton: document.querySelector('#copyConfigButton'),
   saveRewriteButton: document.querySelector('#saveRewriteButton'),
   copyRewriteButton: document.querySelector('#copyRewriteButton'),
   copyPreviewButton: document.querySelector('#copyPreviewButton'),
   copyFileNameButton: document.querySelector('#copyFileNameButton'),
+  profileModal: document.querySelector('#profileModal'),
+  modalTitle: document.querySelector('#modalTitle'),
+  modalClose: document.querySelector('#modalClose'),
+  modalCancel: document.querySelector('#modalCancel'),
+  modalSave: document.querySelector('#modalSave'),
+  modalName: document.querySelector('#modalName'),
+  modalOriginFile: document.querySelector('#modalOriginFile'),
+  modalOutputFile: document.querySelector('#modalOutputFile'),
+  modalRewriteOutputFile: document.querySelector('#modalRewriteOutputFile'),
+  modalUrl: document.querySelector('#modalUrl'),
+  modalUserAgent: document.querySelector('#modalUserAgent'),
+  modalInterval: document.querySelector('#modalInterval'),
+  fetchSubscriptionButton: document.querySelector('#fetchSubscriptionButton'),
+  subBar: document.querySelector('#subscriptionInfoBar'),
+  subUpload: document.querySelector('#subUpload'),
+  subDownload: document.querySelector('#subDownload'),
+  subTotal: document.querySelector('#subTotal'),
+  subExpire: document.querySelector('#subExpire'),
 };
+
+function formatBytes(bytes) {
+  if (!bytes || bytes === 0) { return '0 B'; }
+  const units = ['B', 'KB', 'MB', 'GB', 'TB'];
+  const i = Math.floor(Math.log(bytes) / Math.log(1024));
+  return (bytes / Math.pow(1024, i)).toFixed(1) + ' ' + units[i];
+}
 
 function setStatus(message) {
   els.statusText.textContent = message;
@@ -72,40 +142,34 @@ function notify(message, type = 'info') {
 }
 
 async function requestJson(url, options = {}) {
+  const headers = {
+    ...(options.body !== undefined ? { 'Content-Type': 'application/json' } : {}),
+    ...(options.headers || {}),
+  };
+
   const response = await fetch(url, {
-    headers: {
-      'Content-Type': 'application/json',
-      ...(options.headers || {}),
-    },
     ...options,
+    headers,
   });
-  const payload = await response.json();
+  const text = await response.text();
+  let payload = null;
+
+  if (text) {
+    try {
+      payload = JSON.parse(text);
+    } catch {
+      payload = text;
+    }
+  }
 
   if (!response.ok) {
-    throw new Error(payload.error || 'Request failed');
+    throw new Error(payload?.message || payload?.error || text || 'Request failed');
   }
 
   return payload;
 }
 
-async function requestText(url, options = {}) {
-  const response = await fetch(url, options);
-  const text = await response.text();
-
-  if (!response.ok) {
-    throw new Error(text || 'Request failed');
-  }
-
-  return text;
-}
-
 function showView(view, pushState = true) {
-  if (pushState) {
-    const path = view === VIEWS.FILES ? "/files" : view === VIEWS.REWRITE ? "/rewrite" : "/config";
-    if (window.location.pathname !== path) {
-      window.history.pushState({ view }, "", path);
-    }
-  }
   currentView = view;
   els.configView.hidden = view !== VIEWS.CONFIG;
   els.rewriteView.hidden = view !== VIEWS.REWRITE;
@@ -114,10 +178,14 @@ function showView(view, pushState = true) {
   for (const button of els.navButtons) {
     button.classList.toggle('active', button.dataset.view === view);
   }
+
+  if (pushState) {
+    writeUrlState();
+  }
 }
 
-async function loadView(view) {
-  showView(view);
+async function loadView(view, { pushState = true } = {}) {
+  showView(view, pushState);
   setStatus('Loading');
 
   if (view === VIEWS.CONFIG) {
@@ -132,25 +200,48 @@ async function loadView(view) {
 }
 
 function appendConfigRow(profile = {}) {
-  const isExistingProfile = Boolean(profile.name);
   const row = document.createElement('div');
   row.className = 'mapping-row';
-  row.innerHTML = `
-    <input data-field="name" type="text" ${isExistingProfile ? 'readonly' : ''}>
-    <input data-field="originFile" type="text">
-    <input data-field="outputFile" type="text">
-    <input data-field="rewriteOutputFile" type="text">
-    <button type="button">Remove</button>
-  `;
 
-  row.querySelector('[data-field="name"]').value = profile.name || '';
-  row.querySelector('[data-field="originFile"]').value = profile.originFile || '';
-  row.querySelector('[data-field="outputFile"]').value = profile.outputFile || '';
-  row.querySelector('[data-field="rewriteOutputFile"]').value = profile.rewriteOutputFile || '';
-  row.querySelector('button').addEventListener('click', () => row.remove());
+  const name = document.createElement('span');
+  name.className = 'row-name';
+  name.textContent = profile.name || '';
+
+  const origin = document.createElement('span');
+  origin.className = 'row-origin';
+  origin.textContent = profile.originFile || '';
+
+  const url = document.createElement('span');
+  url.className = 'row-suburl';
+  url.textContent = profile.url || '';
+
+  const actions = document.createElement('div');
+  actions.className = 'row-actions';
+
+  const editButton = document.createElement('button');
+  editButton.className = 'edit-button';
+  editButton.type = 'button';
+  editButton.textContent = 'Edit';
+
+  const removeButton = document.createElement('button');
+  removeButton.type = 'button';
+  removeButton.textContent = 'Remove';
+
+  actions.append(editButton, removeButton);
+  row.append(name, origin, url, actions);
+
+  row.dataset.profile = JSON.stringify(profile);
+  editButton.addEventListener('click', () => openProfileModal(profile, row));
+  removeButton.addEventListener('click', () => {
+    const p = JSON.parse(row.dataset.profile || '{}');
+    if (p.name) {
+      deleteProfile(p.name).catch((error) => notify(error.message, 'error'));
+    } else {
+      row.remove();
+    }
+  });
   els.configRows.appendChild(row);
 }
-
 function renderConfig(config) {
   configCache = config;
   els.originDirInput.value = config.originDir;
@@ -162,17 +253,95 @@ function renderConfig(config) {
   }
 }
 
+let editingRow = null;
+
+function openProfileModal(profile = {}, row = null) {
+  editingRow = row;
+  const isNew = !profile.name;
+  const capacityName = toCapitalizeCase(profile.name);
+  els.modalTitle.textContent = isNew ? 'Add Profile' : 'Edit Profile';
+  els.modalName.value = profile.name || '';
+  els.modalName.readOnly = !isNew;
+  els.modalOriginFile.value = profile.originFile || '';
+  els.modalOutputFile.value = profile.outputFile || '';
+  els.modalOutputFile.placeholder = `${capacityName || '{Profile Name}'}_Output.yaml`;
+  els.modalRewriteOutputFile.value = profile.rewriteOutputFile || '';
+  els.modalRewriteOutputFile.placeholder = `${capacityName || '{Profile Name}'}_Rewrite.yaml`;
+  els.modalUrl.value = profile.url || '';
+  els.modalUserAgent.value = profile.userAgent || '';
+  els.modalInterval.value = profile.updateInterval || '';
+  els.profileModal.hidden = false;
+}
+
+function closeProfileModal() {
+  els.profileModal.hidden = true;
+  editingRow = null;
+}
+
+function collectModalProfile() {
+  const profile = {
+    name: els.modalName.value.trim(),
+    originFile: els.modalOriginFile.value.trim(),
+  };
+
+  const outputFile = els.modalOutputFile.value.trim();
+  const rewriteOutputFile = els.modalRewriteOutputFile.value.trim();
+  const url = els.modalUrl.value.trim();
+  const userAgent = els.modalUserAgent.value.trim();
+  const updateInterval = els.modalInterval.value.trim();
+
+  if (outputFile) {
+    profile.outputFile = outputFile;
+  }
+  if (rewriteOutputFile) {
+    profile.rewriteOutputFile = rewriteOutputFile;
+  }
+  if (url) {
+    profile.url = url;
+  }
+  if (userAgent) {
+    profile.userAgent = userAgent;
+  }
+  if (updateInterval) {
+    profile.updateInterval = Number(updateInterval) || 0;
+  }
+
+  return profile;
+}
+
+async function saveModalProfile() {
+  const profile = collectModalProfile();
+  if (!profile.name || !profile.originFile) { notify('Name and Origin File are required.', 'error'); return; }
+  setStatus('Saving profile');
+  try {
+    const isNew = !editingRow;
+    await requestJson(isNew ? '/api/profile' : `/api/profile/${encodeURIComponent(profile.name)}`, {
+      method: isNew ? 'POST' : 'PUT',
+      body: JSON.stringify(profile),
+    });
+    closeProfileModal();
+    await loadConfig();
+    notify('Profile saved');
+  } catch (error) {
+    notify(error.message, 'error');
+  }
+}
+
 async function loadConfig() {
-  renderConfig(await requestJson('/api/config'));
+  const [config, profileResult] = await Promise.all([
+    requestJson('/api/config'),
+    requestJson('/api/profile'),
+  ]);
+  renderConfig({
+    ...config,
+    profiles: profileResult.profiles || [],
+  });
 }
 
 function collectConfig() {
-  const profiles = [...els.configRows.querySelectorAll('.mapping-row')].map((row) => ({
-    name: row.querySelector('[data-field="name"]').value.trim(),
-    originFile: row.querySelector('[data-field="originFile"]').value.trim(),
-    outputFile: row.querySelector('[data-field="outputFile"]').value.trim(),
-    rewriteOutputFile: row.querySelector('[data-field="rewriteOutputFile"]').value.trim(),
-  }));
+  const profiles = [...els.configRows.querySelectorAll('.mapping-row')].map((row) => {
+    try { return JSON.parse(row.dataset.profile || '{}'); } catch { return {}; }
+  });
 
   return {
     profiles,
@@ -213,26 +382,16 @@ function getConfigText() {
   return lines.join('\n');
 }
 
-async function saveConfig() {
-  const config = collectConfig();
-  validateConfig(config);
-  setStatus('Saving config');
-  await requestJson('/api/config', {
-    method: 'PUT',
-    body: JSON.stringify(config),
-  });
-  notify('Config saved');
-}
-
 async function loadRewrite() {
-  els.rewriteEditor.value = await requestText('/api/rewrite');
+  const content = await requestJson('/api/rewrite/script');
+  els.rewriteEditor.value = content || '';
 }
 
 async function saveRewrite() {
   setStatus('Saving rewrite');
-  await requestJson('/api/rewrite', {
+  await requestJson('/api/rewrite/script', {
     method: 'PUT',
-    body: JSON.stringify({ content: els.rewriteEditor.value }),
+    body: JSON.stringify(els.rewriteEditor.value),
   });
   notify('Rewrite saved');
 }
@@ -249,6 +408,7 @@ function renderProfiles(profiles) {
     button.children[1].textContent = profile.originFile;
     button.addEventListener('click', () => {
       selectedProfileName = profile.name;
+      writeUrlState();
       loadSelectedFile().catch((error) => notify(error.message, 'error'));
       renderProfiles(configCache.profiles);
     });
@@ -260,46 +420,61 @@ function renderTabs() {
   for (const button of els.tabButtons) {
     button.classList.toggle('active', button.dataset.preview === selectedFileType);
   }
+  els.fetchSubscriptionButton.hidden = true;
+  els.previewEditor.readOnly = selectedFileType !== FILE_TYPES.ORIGIN;
   els.saveFileButton.hidden = selectedFileType !== FILE_TYPES.ORIGIN;
   els.copyFileNameButton.hidden = selectedFileType === FILE_TYPES.ORIGIN;
 }
 
 async function loadFiles() {
-  configCache = await requestJson('/api/config');
+  const [config, profileResult] = await Promise.all([
+    requestJson('/api/config'),
+    requestJson('/api/profile'),
+  ]);
+  configCache = {
+    ...config,
+    profiles: profileResult.profiles || [],
+  };
   if (!configCache.profiles.some((profile) => profile.name === selectedProfileName)) {
     selectedProfileName = configCache.profiles[0]?.name || '';
   }
   renderProfiles(configCache.profiles);
   renderTabs();
+  writeUrlState({ replace: true });
   await loadSelectedFile();
 }
 
 async function loadSelectedFile() {
   if (!selectedProfileName) {
     els.previewSummary.textContent = 'No profiles configured';
-    els.previewTitle.textContent = '';
     els.previewName.textContent = '';
-    els.previewContent.textContent = '';
+    els.previewEditor.value = '';
+    els.fetchSubscriptionButton.hidden = true;
+    els.subBar.hidden = true;
     return;
   }
 
   setStatus('Loading file');
-  const params = new URLSearchParams({
-    name: selectedProfileName,
-    type: selectedFileType,
-  });
-  const file = await requestJson(`/api/file?${params.toString()}`);
+  const profile = configCache?.profiles?.find((item) => item.name === selectedProfileName);
+  const { fileName, content, userInfo } = await requestJson(`/api/profile/${encodeURIComponent(selectedProfileName)}/content/${selectedFileType}`);
 
-  els.previewSummary.textContent = file.name;
-  els.previewTitle.textContent = file.type[0].toUpperCase() + file.type.slice(1);
-  els.previewName.textContent = file.fileName;
-  const isOrigin = file.type === FILE_TYPES.ORIGIN;
-  els.previewContent.hidden = isOrigin;
-  els.previewEditor.hidden = !isOrigin;
-  if (isOrigin) {
-    els.previewEditor.value = file.content;
+  els.previewSummary.textContent = selectedProfileName;
+  els.previewName.textContent = fileName;
+  els.previewEditor.value = content;
+  els.fetchSubscriptionButton.hidden = selectedFileType !== FILE_TYPES.ORIGIN || !profile?.url;
+
+  if (userInfo) {
+    els.subBar.hidden = false;
+    els.subUpload.textContent = formatBytes(userInfo.upload);
+    els.subUpload.dataset.label = 'Upload';
+    els.subDownload.textContent = formatBytes(userInfo.download);
+    els.subDownload.dataset.label = 'Download';
+    els.subTotal.textContent = formatBytes(userInfo.total);
+    els.subTotal.dataset.label = 'Total';
+    els.subExpire.textContent = userInfo.expire ? new Date(userInfo.expire * 1000).toLocaleString() : 'N/A';
+    els.subExpire.dataset.label = 'Expire';
   } else {
-    els.previewContent.textContent = file.content;
+    els.subBar.hidden = true;
   }
   setStatus('Ready');
 }
@@ -309,16 +484,13 @@ async function runRewrite() {
   els.runButton.disabled = true;
 
   try {
-    await requestJson('/api/run', {
-      method: 'POST',
-      body: '{}',
-    });
+    const result = await requestJson('/api/rewrite/run', { method: 'POST' });
 
     if (currentView === VIEWS.FILES) {
       await loadSelectedFile();
     }
 
-    notify('Rewrite complete');
+    notify(result.message || 'Rewrite complete');
   } finally {
     els.runButton.disabled = false;
   }
@@ -343,18 +515,51 @@ async function copyText(text) {
 
 async function saveOriginFile() {
   setStatus('Saving origin file');
-  await requestJson('/api/file', {
+  const result = await requestJson(`/api/profile/${encodeURIComponent(selectedProfileName)}/content`, {
     method: 'PUT',
-    body: JSON.stringify({ name: selectedProfileName, type: FILE_TYPES.ORIGIN, content: els.previewEditor.value }),
+    body: JSON.stringify(els.previewEditor.value),
   });
   setStatus('Ready');
-  notify('Origin file saved');
+  notify(result.message || 'Origin file saved');
 }
 
 window.addEventListener("popstate", (e) => {
-  const view = e.state?.view || getViewFromPath();
-  loadView(view).catch((error) => notify(error.message, "error"));
+  const state = e.state || getStateFromUrl();
+  selectedProfileName = state.profile || '';
+  selectedFileType = isValidFileType(state.type) ? state.type : FILE_TYPES.ORIGIN;
+  loadView(state.view || VIEWS.CONFIG, { pushState: false }).catch((error) => notify(error.message, "error"));
 });
+
+async function fetchSubscription() {
+  setStatus('Fetching subscription');
+  els.fetchSubscriptionButton.disabled = true;
+  try {
+    const result = await requestJson(`/api/profile/${encodeURIComponent(selectedProfileName)}/fetch`, {
+      method: 'POST',
+    });
+    await loadFiles();
+    notify(result.message || 'Subscription fetched');
+  } finally {
+    els.fetchSubscriptionButton.disabled = false;
+  }
+}
+
+async function deleteProfile(name) {
+  if (!confirm(`Delete profile "${name}"? This cannot be undone.`)) { return; }
+  setStatus('Deleting profile');
+  try {
+    await requestJson(`/api/profile/${encodeURIComponent(name)}`, { method: 'DELETE' });
+    await loadConfig();
+    notify('Profile deleted');
+  } catch (error) {
+    notify(error.message, 'error');
+  }
+}
+
+function toCapitalizeCase(str) {
+  if (!str) return '';
+  return str.charAt(0).toUpperCase() + str.slice(1);
+}
 
 function bindEvents() {
   for (const button of els.navButtons) {
@@ -367,6 +572,7 @@ function bindEvents() {
     button.addEventListener('click', () => {
       selectedFileType = button.dataset.preview;
       renderTabs();
+      writeUrlState();
       loadSelectedFile().catch((error) => notify(error.message, 'error'));
     });
   }
@@ -375,8 +581,15 @@ function bindEvents() {
     runRewrite().catch((error) => notify(error.message, 'error'));
   });
 
-  els.addConfigRowButton.addEventListener('click', () => appendConfigRow());
-  els.saveConfigButton.addEventListener('click', () => saveConfig().catch((error) => notify(error.message, 'error')));
+  els.addConfigRowButton.addEventListener('click', () => openProfileModal());
+  els.modalClose.addEventListener('click', closeProfileModal);
+  els.modalCancel.addEventListener('click', closeProfileModal);
+  els.modalSave.addEventListener('click', saveModalProfile);
+  els.modalName.addEventListener('input', (e) => {
+    let value = toCapitalizeCase(e.target.value.trim()) || '{Profile Name}';
+    els.modalOutputFile.placeholder = `${value}_Output.yaml`;
+    els.modalRewriteOutputFile.placeholder = `${value}_Rewrite.js`;
+  });
   els.saveRewriteButton.addEventListener('click', () => saveRewrite().catch((error) => notify(error.message, 'error')));
   els.copyConfigButton.addEventListener('click', () => {
     copyText(getConfigText())
@@ -389,7 +602,7 @@ function bindEvents() {
       .catch((error) => notify(error.message, 'error'));
   });
   els.copyPreviewButton.addEventListener('click', () => {
-    copyText(selectedFileType === FILE_TYPES.ORIGIN ? els.previewEditor.value : els.previewContent.textContent)
+    copyText(els.previewEditor.value)
       .then(() => notify('Preview copied'))
       .catch((error) => notify(error.message, 'error'));
   });
@@ -400,6 +613,9 @@ function bindEvents() {
   });
   els.saveFileButton.addEventListener('click', () => {
     saveOriginFile().catch((error) => notify(error.message, 'error'));
+  });
+  els.fetchSubscriptionButton.addEventListener('click', () => {
+    fetchSubscription().catch((error) => notify(error.message, 'error'));
   });
 
   window.addEventListener('keydown', (e) => {
@@ -415,8 +631,10 @@ function bindEvents() {
 }
 
 bindEvents();
-const initialView = getViewFromPath();
-if (initialView !== currentView) {
-  showView(initialView, false);
+const initialState = getStateFromUrl();
+selectedProfileName = initialState.profile;
+selectedFileType = initialState.type;
+if (initialState.view !== currentView) {
+  showView(initialState.view, false);
 }
-loadView(initialView).catch((error) => notify(error.message, 'error'));
+loadView(initialState.view, { pushState: false }).catch((error) => notify(error.message, 'error'));

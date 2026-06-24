@@ -36,7 +36,7 @@
               </div>
               <div class="button-row">
                 <button id="copyConfigButton" type="button">Copy Config</button>
-                <button id="saveConfigButton" class="primary-button" type="button">Save Config</button>
+                
               </div>
             </div>
 
@@ -59,15 +59,37 @@
 
               <div class="mapping-table">
                 <div class="mapping-header">
-                  <span>Profile Name<sup>*</sup></span>
-                  <span>Origin File<sup>*</sup></span>
-                  <span>Output File</span>
-                  <span>Rewrite Output File</span>
+                  <span>Profile Name</span>
+                  <span>Origin File</span>
+                  <span>Subscription URL</span>
                   <span></span>
                 </div>
                 <div id="configRows"></div>
               </div>
             </section>
+
+            <div id="profileModal" class="modal-overlay" hidden>
+              <div class="modal-card">
+                <div class="modal-header">
+                  <h3 id="modalTitle">Edit Profile</h3>
+                  <button id="modalClose" type="button">&times;</button>
+                </div>
+                <div class="modal-body">
+                  <label><span>Profile Name<sup>*</sup></span><input id="modalName" type="text" placeholder="Unique profile name"></label>
+                  <label><span>Origin File<sup>*</sup></span><input id="modalOriginFile" type="text" placeholder="File name in origin directory"></label>
+                  <label><span>Output File</span><input id="modalOutputFile" type="text" placeholder="{Profile Name}_Output.yaml"></label>
+                  <label><span>Rewrite Output File</span><input id="modalRewriteOutputFile" type="text" placeholder="{Profile Name}_Rewrite.js"></label>
+                  <label><span>Subscription URL</span><input id="modalUrl" type="text" placeholder="http(s)://url"></label>
+                  <label><span>User-Agent</span><input id="modalUserAgent" type="text" placeholder="clash"></label>
+                  <label><span>Update Interval (s)</span><input id="modalInterval" type="number" placeholder="0 (means never update)"></label>
+                </div>
+                <div class="modal-footer">
+                  <button id="modalCancel" type="button">Cancel</button>
+                  <button id="modalSave" class="primary-button" type="button">Save</button>
+                </div>
+              </div>
+            </div>
+            
           </section>
 
           <section id="rewriteView" class="view-panel" hidden>
@@ -113,13 +135,20 @@
                 </div>
                 <div class="file-panel">
                   <div class="panel-title">
-                    <span id="previewTitle">Origin</span>
                     <span id="previewName"></span>
+                    <button id="fetchSubscriptionButton" class="primary-button" type="button" hidden>Update</button>
                     <button id="saveFileButton" class="primary-button" type="button" hidden>Save File</button>
                     <button id="copyFileNameButton" type="button" hidden>Copy Name</button>
                   </div>
-                  <pre id="previewContent"></pre>
-                  <textarea id="previewEditor" spellcheck="false" hidden></textarea>
+                  <div class="editor-area">
+                    <textarea id="previewEditor" spellcheck="false" readonly></textarea>
+                  </div>
+                </div>
+                <div id="subscriptionInfoBar" class="subscription-info-bar" hidden>
+                  <span id="subUpload"></span>
+                  <span id="subDownload"></span>
+                  <span id="subTotal"></span>
+                  <span id="subExpire"></span>
                 </div>
               </section>
             </div>
