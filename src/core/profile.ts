@@ -1,7 +1,7 @@
 import path from "path";
 import yaml from "js-yaml";
 import { z } from "zod";
-import { ProfileInfo, ProfileTypeEnum, RawProfileConfig, RawProfileConfigSchema, SubscriptionUserInfo } from "../model/profile";
+import { ProfileInfo, ProfileTypeEnum, RawProfileConfig, RawProfileConfigSchema } from "../model/profile";
 import { readFile, readProfileConfig, writeFile, writeProfileConfig } from "./repository";
 import { CoreError } from "../errors/core-error";
 import { getOriginDir, getOutputDir } from "./config";
@@ -161,6 +161,7 @@ async function readProfileContentFile(path: string): Promise<string> {
 
 function checkProfileConfigs(raw: RawProfileConfig[]): void {
   const profileNameSet = new Set<string>();
+  const originNameSet = new Set<string>();
   const outputNameSet = new Set<string>();
   
   for (const profile of raw) {
@@ -172,6 +173,12 @@ function checkProfileConfigs(raw: RawProfileConfig[]): void {
       throw new CoreError(`Duplicate profile name: ${profile.name}`);
     }
     profileNameSet.add(profile.name);
+
+    const originFileName = profile.originFile;
+    if (originNameSet.has(originFileName)) {
+      throw new CoreError(`Duplicate origin file name: ${originFileName}`);
+    }
+    originNameSet.add(originFileName);
 
     const outputFileName = profile.outputFile ?? getDefaultFileName(profile.name, ProfileTypeEnum.OUTPUT);
     if (outputNameSet.has(outputFileName)) {

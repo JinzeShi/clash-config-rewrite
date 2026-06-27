@@ -502,6 +502,10 @@ textarea {
   font-weight: 500;
 }
 
+#subUpdateTime {
+  margin-left: auto;
+}
+
 .editor-area {
   min-height: 0;
   display: flex;

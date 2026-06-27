@@ -1,5 +1,5 @@
-import { getProfileInfo, getProfileInfoByOutputFileName, getProfileInfoContent, getRawProfileConfigs, replaceRawProfileConfigs, updateProfileContent } from "../core/profile";
-import { GetProfileContentResponseDTO, GetProfilesResponseDTO, ProfileDTO } from "../dto/profile";
+import { getDefaultFileName, getProfileInfo, getProfileInfoByOutputFileName, getProfileInfoContent, getRawProfileConfigs, replaceRawProfileConfigs, updateProfileContent } from "../core/profile";
+import { GetProfileContentResponseDTO, GetProfilesResponseDTO, GetProfileSuggestionsResponseDTO, ProfileDTO } from "../dto/profile";
 import { ProfileTypeEnum, RawProfileConfig, SubscriptionUserInfo, SubscriptionUserInfoSchema } from "../model/profile";
 import { BusinessError } from "../errors/business-error";
 import { logger } from "../core/logger";
@@ -135,12 +135,21 @@ export async function fetchProfile(name: string): Promise<void> {
   }
 }
 
+export async function getProfileSuggestions(name: string): Promise<GetProfileSuggestionsResponseDTO> {
+  return {
+    originFile: getDefaultFileName(name, ProfileTypeEnum.ORIGIN),
+    outputFile: getDefaultFileName(name, ProfileTypeEnum.OUTPUT),
+    rewriteOutputFile: getDefaultFileName(name, ProfileTypeEnum.REWRITE),
+  };
+}
+
 export async function getProfileContent(name: string, type: ProfileTypeEnum): Promise<GetProfileContentResponseDTO> {
   const { info, content } = await getProfileInfoContent(name, type);
   return {
     name: info.name,
     type: info.type,
     fileName: info.sourceFileName,
+    ...(info.subscriptionInfo?.updateTime ? { updateTime: info.subscriptionInfo.updateTime } : {}),
     ...(info.subscriptionInfo?.userInfo ? { userInfo: info.subscriptionInfo.userInfo } : {}),
     content,
   };

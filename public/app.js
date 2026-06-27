@@ -14,6 +14,8 @@ let currentView = VIEWS.CONFIG;
 let selectedProfileName = '';
 let selectedFileType = FILE_TYPES.ORIGIN;
 let configCache = null;
+let profileSuggestionTimer = null;
+let profileSuggestionRequestId = 0;
 
 function isValidView(view) {
   return Object.values(VIEWS).includes(view);
@@ -89,7 +91,6 @@ const els = {
   configRows: document.querySelector('#configRows'),
   addConfigRowButton: document.querySelector('#addConfigRowButton'),
   rewriteEditor: document.querySelector('#rewriteEditor'),
-  copyConfigButton: document.querySelector('#copyConfigButton'),
   saveRewriteButton: document.querySelector('#saveRewriteButton'),
   copyRewriteButton: document.querySelector('#copyRewriteButton'),
   copyPreviewButton: document.querySelector('#copyPreviewButton'),
@@ -112,6 +113,7 @@ const els = {
   subDownload: document.querySelector('#subDownload'),
   subTotal: document.querySelector('#subTotal'),
   subExpire: document.querySelector('#subExpire'),
+  subUpdateTime: document.querySelector('#subUpdateTime'),
 };
 
 function formatBytes(bytes) {
@@ -139,6 +141,60 @@ function showToast(message, type = 'info') {
 function notify(message, type = 'info') {
   setStatus(message);
   showToast(message, type);
+}
+
+function showInputPlaceholder(input) {
+  input.placeholder = input.dataset.placeholder || '';
+}
+
+function hideInputPlaceholder(input) {
+  input.placeholder = '';
+}
+
+function resetProfileSuggestionState() {
+  window.clearTimeout(profileSuggestionTimer);
+  profileSuggestionRequestId += 1;
+  applyDefualtProfileSuggestions();
+}
+
+function getSuggestedValue(suggestions, field) {
+  return suggestions?.[field] || '';
+}
+
+function applyDefualtProfileSuggestions() {
+  els.modalOriginFile.placeholder = 'Unique file name in origin directory';
+  els.modalOutputFile.placeholder = 'Unique file name in output directory';
+  els.modalRewriteOutputFile.placeholder = 'Unique file name in output directory';
+}
+
+function applyProfileSuggestions(suggestions) {
+  els.modalOriginFile.placeholder = getSuggestedValue(suggestions, 'originFile');
+  els.modalOutputFile.placeholder = getSuggestedValue(suggestions, 'outputFile');
+  els.modalRewriteOutputFile.placeholder = getSuggestedValue(suggestions, 'rewriteOutputFile');
+}
+
+async function requestProfileSuggestions(name) {
+  const trimmedName = name.trim();
+  if (!trimmedName) {
+    applyDefualtProfileSuggestions();
+    return;
+  }
+
+  const requestId = ++profileSuggestionRequestId;
+  const suggestions = await requestJson(`/api/profile/suggestions?name=${encodeURIComponent(trimmedName)}`);
+
+  if (requestId !== profileSuggestionRequestId || els.modalName.value.trim() !== trimmedName) {
+    return;
+  }
+
+  applyProfileSuggestions(suggestions);
+}
+
+function queueProfileSuggestions(name) {
+  window.clearTimeout(profileSuggestionTimer);
+  profileSuggestionTimer = window.setTimeout(() => {
+    requestProfileSuggestions(name).catch((error) => notify(error.message, 'error'));
+  }, 250);
 }
 
 async function requestJson(url, options = {}) {
@@ -227,6 +283,25 @@ function appendConfigRow(profile = {}) {
   removeButton.type = 'button';
   removeButton.textContent = 'Remove';
 
+  if (profile.url) {
+    const updateButton = document.createElement('button');
+    updateButton.className = 'primary-button';
+    updateButton.type = 'button';
+    updateButton.textContent = 'Update';
+    updateButton.addEventListener('click', () => {
+      fetchProfileSubscription(profile.name, {
+        beforeFetch: () => {
+          updateButton.disabled = true;
+        },
+        afterFetch: () => {
+          updateButton.disabled = false;
+        },
+        afterSuccess: loadConfig,
+      }).catch((error) => notify(error.message, 'error'));
+    });
+    actions.append(updateButton);
+  }
+
   actions.append(editButton, removeButton);
   row.append(name, origin, url, actions);
 
@@ -256,32 +331,38 @@ function renderConfig(config) {
 let editingRow = null;
 
 function openProfileModal(profile = {}, row = null) {
+  resetProfileSuggestionState();
   editingRow = row;
   const isNew = !profile.name;
-  const capacityName = toCapitalizeCase(profile.name);
   els.modalTitle.textContent = isNew ? 'Add Profile' : 'Edit Profile';
   els.modalName.value = profile.name || '';
   els.modalName.readOnly = !isNew;
   els.modalOriginFile.value = profile.originFile || '';
   els.modalOutputFile.value = profile.outputFile || '';
-  els.modalOutputFile.placeholder = `${capacityName || '{Profile Name}'}_Output.yaml`;
   els.modalRewriteOutputFile.value = profile.rewriteOutputFile || '';
-  els.modalRewriteOutputFile.placeholder = `${capacityName || '{Profile Name}'}_Rewrite.yaml`;
   els.modalUrl.value = profile.url || '';
   els.modalUserAgent.value = profile.userAgent || '';
-  els.modalInterval.value = profile.updateInterval || '';
+  els.modalInterval.value = profile.updateInterval ?? '';
+  hideInputPlaceholder(els.modalUrl);
+  hideInputPlaceholder(els.modalUserAgent);
+  hideInputPlaceholder(els.modalInterval);
   els.profileModal.hidden = false;
+
+  if (profile.name) {
+    requestProfileSuggestions(profile.name).catch((error) => notify(error.message, 'error'));
+  }
 }
 
 function closeProfileModal() {
   els.profileModal.hidden = true;
   editingRow = null;
+  resetProfileSuggestionState();
 }
 
 function collectModalProfile() {
   const profile = {
     name: els.modalName.value.trim(),
-    originFile: els.modalOriginFile.value.trim(),
+    originFile: els.modalOriginFile.value.trim() || els.modalOriginFile.placeholder.trim(),
   };
 
   const outputFile = els.modalOutputFile.value.trim();
@@ -302,7 +383,7 @@ function collectModalProfile() {
   if (userAgent) {
     profile.userAgent = userAgent;
   }
-  if (updateInterval) {
+  if (updateInterval !== '') {
     profile.updateInterval = Number(updateInterval) || 0;
   }
 
@@ -311,7 +392,7 @@ function collectModalProfile() {
 
 async function saveModalProfile() {
   const profile = collectModalProfile();
-  if (!profile.name || !profile.originFile) { notify('Name and Origin File are required.', 'error'); return; }
+  if (!profile.name) { notify('Name is required.', 'error'); return; }
   setStatus('Saving profile');
   try {
     const isNew = !editingRow;
@@ -336,50 +417,6 @@ async function loadConfig() {
     ...config,
     profiles: profileResult.profiles || [],
   });
-}
-
-function collectConfig() {
-  const profiles = [...els.configRows.querySelectorAll('.mapping-row')].map((row) => {
-    try { return JSON.parse(row.dataset.profile || '{}'); } catch { return {}; }
-  });
-
-  return {
-    profiles,
-  };
-}
-
-function validateConfig(config) {
-  const names = new Set();
-
-  for (const [index, profile] of config.profiles.entries()) {
-    if (!profile.name || !profile.originFile) {
-      throw new Error(`Profile ${index + 1} is incomplete.`);
-    }
-
-    if (names.has(profile.name)) {
-      throw new Error(`Profile "${profile.name}" is duplicated.`);
-    }
-
-    names.add(profile.name);
-  }
-}
-
-function getConfigText() {
-  const config = collectConfig();
-  const lines = [`originDir: ${els.originDirInput.value.trim()}`, `outputDir: ${els.outputDirInput.value.trim()}`, 'profiles:'];
-
-  for (const profile of config.profiles) {
-    lines.push(`  - name: ${profile.name}`);
-    lines.push(`    originFile: ${profile.originFile}`);
-    if (profile.outputFile) {
-      lines.push(`    outputFile: ${profile.outputFile}`);
-    }
-    if (profile.rewriteOutputFile) {
-      lines.push(`    rewriteOutputFile: ${profile.rewriteOutputFile}`);
-    }
-  }
-
-  return lines.join('\n');
 }
 
 async function loadRewrite() {
@@ -456,14 +493,14 @@ async function loadSelectedFile() {
 
   setStatus('Loading file');
   const profile = configCache?.profiles?.find((item) => item.name === selectedProfileName);
-  const { fileName, content, userInfo } = await requestJson(`/api/profile/${encodeURIComponent(selectedProfileName)}/content/${selectedFileType}`);
+  const { fileName, content, userInfo, updateTime } = await requestJson(`/api/profile/${encodeURIComponent(selectedProfileName)}/content/${selectedFileType}`);
 
   els.previewSummary.textContent = selectedProfileName;
   els.previewName.textContent = fileName;
   els.previewEditor.value = content;
   els.fetchSubscriptionButton.hidden = selectedFileType !== FILE_TYPES.ORIGIN || !profile?.url;
 
-  if (userInfo) {
+  if (userInfo && updateTime) {
     els.subBar.hidden = false;
     els.subUpload.textContent = formatBytes(userInfo.upload);
     els.subUpload.dataset.label = 'Upload';
@@ -473,6 +510,8 @@ async function loadSelectedFile() {
     els.subTotal.dataset.label = 'Total';
     els.subExpire.textContent = userInfo.expire ? new Date(userInfo.expire * 1000).toLocaleString() : 'N/A';
     els.subExpire.dataset.label = 'Expire';
+    els.subUpdateTime.textContent = updateTime ? new Date(updateTime).toLocaleString() : 'N/A';
+    els.subUpdateTime.dataset.label = 'Updated';
   } else {
     els.subBar.hidden = true;
   }
@@ -530,18 +569,30 @@ window.addEventListener("popstate", (e) => {
   loadView(state.view || VIEWS.CONFIG, { pushState: false }).catch((error) => notify(error.message, "error"));
 });
 
-async function fetchSubscription() {
+async function fetchProfileSubscription(name, { beforeFetch, afterFetch, afterSuccess } = {}) {
   setStatus('Fetching subscription');
-  els.fetchSubscriptionButton.disabled = true;
+  beforeFetch?.();
   try {
-    const result = await requestJson(`/api/profile/${encodeURIComponent(selectedProfileName)}/fetch`, {
+    const result = await requestJson(`/api/profile/${encodeURIComponent(name)}/fetch`, {
       method: 'POST',
     });
-    await loadFiles();
+    await afterSuccess?.();
     notify(result.message || 'Subscription fetched');
   } finally {
-    els.fetchSubscriptionButton.disabled = false;
+    afterFetch?.();
   }
+}
+
+async function fetchSubscription() {
+  await fetchProfileSubscription(selectedProfileName, {
+    beforeFetch: () => {
+      els.fetchSubscriptionButton.disabled = true;
+    },
+    afterFetch: () => {
+      els.fetchSubscriptionButton.disabled = false;
+    },
+    afterSuccess: loadFiles,
+  });
 }
 
 async function deleteProfile(name) {
@@ -585,17 +636,14 @@ function bindEvents() {
   els.modalClose.addEventListener('click', closeProfileModal);
   els.modalCancel.addEventListener('click', closeProfileModal);
   els.modalSave.addEventListener('click', saveModalProfile);
+  for (const input of [els.modalUrl, els.modalUserAgent, els.modalInterval]) {
+    input.addEventListener('focus', () => showInputPlaceholder(input));
+    input.addEventListener('blur', () => hideInputPlaceholder(input));
+  }
   els.modalName.addEventListener('input', (e) => {
-    let value = toCapitalizeCase(e.target.value.trim()) || '{Profile Name}';
-    els.modalOutputFile.placeholder = `${value}_Output.yaml`;
-    els.modalRewriteOutputFile.placeholder = `${value}_Rewrite.js`;
+    queueProfileSuggestions(e.target.value);
   });
   els.saveRewriteButton.addEventListener('click', () => saveRewrite().catch((error) => notify(error.message, 'error')));
-  els.copyConfigButton.addEventListener('click', () => {
-    copyText(getConfigText())
-      .then(() => notify('Config copied'))
-      .catch((error) => notify(error.message, 'error'));
-  });
   els.copyRewriteButton.addEventListener('click', () => {
     copyText(els.rewriteEditor.value)
       .then(() => notify('Rewrite copied'))

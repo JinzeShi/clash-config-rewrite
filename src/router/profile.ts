@@ -1,6 +1,6 @@
 import { FastifyInstance } from "fastify";
-import { GetProfileContentResponseDTO, GetProfilesResponseDTO, ProfileDTO, ProfileSchema } from "../dto/profile";
-import { createProfile, deleteProfile, fetchProfile, getProfileContent, listProfiles, putProfileContent, updateProfile } from "../service/profile";
+import { GetProfileContentResponseDTO, GetProfilesResponseDTO, GetProfileSuggestionsResponseDTO, ProfileDTO, ProfileSchema } from "../dto/profile";
+import { createProfile, deleteProfile, fetchProfile, getProfileContent, getProfileSuggestions, listProfiles, putProfileContent, updateProfile } from "../service/profile";
 import { z } from "zod";
 import { ProfileTypeEnum } from "../model/profile";
 
@@ -69,6 +69,22 @@ export default async function profileRoute(fastify: FastifyInstance) {
       const name = req.params.name;
       await fetchProfile(name);
       return { code: 'SUCCESS', message: `Profile "${name}" fetched successfully` };
+    }
+  );
+
+  fastify.get<{
+    Querystring: { name: string };
+    Reply: GetProfileSuggestionsResponseDTO;
+  }>('/suggestions', {
+    schema: {
+      querystring: z.object({
+        name: z.string(),
+      }),
+    },
+  },
+    async (req) => {
+      const name = req.query.name;
+      return await getProfileSuggestions(name);
     }
   );
 

@@ -17,10 +17,17 @@ export type GetProfilesResponseDTO = {
   profiles: ProfileDTO[];
 };
 
+export type GetProfileSuggestionsResponseDTO = {
+  originFile: string;
+  outputFile: string;
+  rewriteOutputFile: string;
+}
+
 export type GetProfileContentResponseDTO = {
   name: string;
   type: ProfileTypeEnum;
   fileName: string;
+  updateTime?: number;
   userInfo?: SubscriptionUserInfo;
   content: string;
 };
