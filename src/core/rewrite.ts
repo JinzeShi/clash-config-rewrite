@@ -62,9 +62,8 @@ async function rewriteProfile(name: string): Promise<void> {
   const outputFilePath = path.join(getOutputDir(), output.sourceFileName);
   const rewriteOutputFilePath = path.join(getOutputDir(), rewrite.sourceFileName);
 
-  const originContent = await readProfileContent(originFilePath);
-  const outputContent = structuredClone(originContent);
-  const rewriteContent = await rewriteFunction(outputContent, name);
+  const outputContent = await readProfileContent(originFilePath);
+  const rewriteContent = await rewriteFunction(structuredClone(outputContent), name);
 
   await Promise.all([
     writeYaml(outputFilePath, outputContent),
