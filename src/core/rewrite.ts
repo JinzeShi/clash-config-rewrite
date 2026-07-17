@@ -55,7 +55,9 @@ export async function rewriteProfileAll(): Promise<{ total: number; fail: number
   return { total: profiles.length, fail, msg };
 }
 
-async function rewriteProfile(name: string): Promise<void> {
+export async function rewriteProfile(name: string): Promise<void> {
+  logger.info(`Rewriting profile "${name}"`);
+
   const { origin, output, rewrite } = getProfileInfoByName(name);
 
   const originFilePath = path.join(getOriginDir(), origin.sourceFileName);
@@ -69,6 +71,8 @@ async function rewriteProfile(name: string): Promise<void> {
     writeYaml(outputFilePath, outputContent),
     writeYaml(rewriteOutputFilePath, rewriteContent)
   ]);
+
+  logger.info(`Successfully rewritten profile "${name}" to output files"`);
 }
 
 function getRewriteFunctionFromCode(code: string): RewriteFunction {

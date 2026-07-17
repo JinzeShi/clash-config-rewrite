@@ -1,8 +1,7 @@
-import { getDefaultFileName, getProfileInfo, getProfileInfoByOutputFileName, getProfileInfoContent, getRawProfileConfigs, replaceRawProfileConfigs, updateProfileContent } from "../core/profile";
+import { fetchAndRewriteProfile, getDefaultFileName, getProfileInfo, getProfileInfoByOutputFileName, getProfileInfoContent, getRawProfileConfigs, replaceRawProfileConfigs, updateProfileContent } from "../core/profile";
 import { GetProfileContentResponseDTO, GetProfilesResponseDTO, GetProfileSuggestionsResponseDTO, ProfileDTO } from "../dto/profile";
-import { ProfileTypeEnum, RawProfileConfig, SubscriptionUserInfo, SubscriptionUserInfoSchema } from "../model/profile";
+import { ProfileTypeEnum, RawProfileConfig, SubscriptionUserInfo } from "../model/profile";
 import { BusinessError } from "../errors/business-error";
-import { logger } from "../core/logger";
 
 export async function listProfiles(): Promise<GetProfilesResponseDTO> {
   return {
@@ -64,75 +63,7 @@ export async function fetchProfile(name: string): Promise<void> {
     throw new BusinessError(`Profile not found for name: ${name}`);
   }
 
-  const subscriptionInfo = profileInfo.subscriptionInfo;
-  if (!subscriptionInfo) {
-    throw new BusinessError(`Profile "${name}" does not have subscription info`);
-  }
-  const url = subscriptionInfo.url;
-  if (!url) {
-    throw new BusinessError(`Profile "${name}" does not have a URL to fetch`);
-  }
-
-  const headers: Record<string, string> = {};
-  if (subscriptionInfo.userAgent) {
-    headers['User-Agent'] = subscriptionInfo.userAgent;
-  }
-
-  const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), 5000);
-
-  let response: Response;
-  try {
-    response = await fetch(url, {
-      headers,
-      signal: controller.signal,
-    });
-  } catch (err) {
-    if (err instanceof DOMException && err.name === 'AbortError') {
-      throw new BusinessError(`Request to fetch profile "${name}" from URL: ${url} timed out`);
-    }
-    throw err;
-  } finally {
-    clearTimeout(timeout);
-  }
-
-  if (!response.ok) {
-    throw new BusinessError(`Failed to fetch profile "${name}" from URL: ${url}, status: ${response.status}`);
-  }
-
-  const content = await response.text();
-  await updateProfileContent(name, content);
-
-  const rawUserInfo = response.headers.get('subscription-userinfo');
-  if (rawUserInfo) {
-    try {
-      const parts: Record<string, string> = {};
-      for (const part of rawUserInfo.split(';')) {
-        const [key, val] = part.trim().split('=');
-        if (key && val) {
-          parts[key.trim()] = val.trim();
-        }
-      }
-      const userInfo = SubscriptionUserInfoSchema.parse({
-        upload: Number(parts["upload"]),
-        download: Number(parts["download"]),
-        total: Number(parts["total"]),
-        expire: Number(parts["expire"]),
-      });
-    
-      const raw = getRawProfileConfigs();
-      const index = raw.findIndex((p) => p.name === name);
-      if (index === -1) {
-        throw new BusinessError(`Profile not found for name: ${name}`);
-      }
-      raw[index]!.updateTime = Date.now();
-      raw[index]!.subscriptionUserInfo = userInfo;
-      
-      await replaceRawProfileConfigs(raw);
-    } catch (err) {
-      logger.warn(`Failed to parse subscription-userinfo header for profile "${name}": ${err}`);
-    }
-  }
+  await fetchAndRewriteProfile(profileInfo);
 }
 
 export async function getProfileSuggestions(name: string): Promise<GetProfileSuggestionsResponseDTO> {
