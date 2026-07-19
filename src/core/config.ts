@@ -11,6 +11,7 @@ const BLACKLIST_DIR = new Set<string>([
   "dist",
   "configs",
   "public",
+  "docs",
 ]);
 
 export async function initAppConfig(): Promise<void> {

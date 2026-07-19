@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>Clash Rewrite</title>
     <link rel="stylesheet" href="/styles.css">
+    <link rel="stylesheet" href="/vendor/codemirror/lib/codemirror.css">
   </head>
   <body>
     <div id="toast" class="toast" hidden></div>
@@ -104,7 +105,9 @@
               <div class="panel-title">
                 <span>rewrite.js</span>
               </div>
-              <textarea id="rewriteEditor" spellcheck="false"></textarea>
+              <div class="editor-body">
+                <textarea id="rewriteEditor"></textarea>
+              </div>
             </section>
           </section>
 
@@ -154,6 +157,11 @@
       </section>
     </main>
 
+    <script src="/vendor/codemirror/lib/codemirror.js"></script>
+    <script src="/vendor/codemirror/mode/javascript/javascript.js"></script>
+    <script src="/vendor/codemirror/mode/yaml/yaml.js"></script>
+    <script src="/vendor/codemirror/addon/edit/closebrackets.js"></script>
+    <script src="/vendor/codemirror/addon/edit/matchbrackets.js"></script>
     <script src="/app.js"></script>
   </body>
 </html>

@@ -116,6 +116,22 @@ const els = {
   subUpdateTime: document.querySelector('#subUpdateTime'),
 };
 
+const cmRewriteEditor = CodeMirror.fromTextArea(els.rewriteEditor, {
+  mode: 'javascript',
+  lineNumbers: true,
+  lineWrapping: true,
+  tabSize: 2,
+  indentUnit: 2
+});
+
+const cmPreviewEditor = CodeMirror.fromTextArea(els.previewEditor, {
+  mode: 'yaml',
+  lineNumbers: true,
+  lineWrapping: true,
+  tabSize: 2,
+  readOnly: true,
+});
+
 function formatBytes(bytes) {
   if (!bytes || bytes === 0) { return '0 B'; }
   const units = ['B', 'KB', 'MB', 'GB', 'TB'];
@@ -233,6 +249,14 @@ function showView(view, pushState = true) {
 
   for (const button of els.navButtons) {
     button.classList.toggle('active', button.dataset.view === view);
+  }
+
+  if (view === VIEWS.REWRITE) {
+    requestAnimationFrame(() => cmRewriteEditor.refresh());
+  }
+
+  if (view === VIEWS.FILES) {
+    requestAnimationFrame(() => cmPreviewEditor.refresh());
   }
 
   if (pushState) {
@@ -421,14 +445,14 @@ async function loadConfig() {
 
 async function loadRewrite() {
   const content = await requestJson('/api/rewrite/script');
-  els.rewriteEditor.value = content || '';
+  cmRewriteEditor.setValue(content);
 }
 
 async function saveRewrite() {
   setStatus('Saving rewrite');
   await requestJson('/api/rewrite/script', {
     method: 'PUT',
-    body: JSON.stringify(els.rewriteEditor.value),
+    body: JSON.stringify(cmRewriteEditor.getValue()),
   });
   notify('Rewrite saved');
 }
@@ -458,7 +482,8 @@ function renderTabs() {
     button.classList.toggle('active', button.dataset.preview === selectedFileType);
   }
   els.fetchSubscriptionButton.hidden = true;
-  els.previewEditor.readOnly = selectedFileType !== FILE_TYPES.ORIGIN;
+  cmPreviewEditor.setOption('readOnly', selectedFileType !== FILE_TYPES.ORIGIN);
+  cmPreviewEditor.getWrapperElement().classList.toggle('cm-editable', selectedFileType === FILE_TYPES.ORIGIN);
   els.saveFileButton.hidden = selectedFileType !== FILE_TYPES.ORIGIN;
   els.copyFileNameButton.hidden = selectedFileType === FILE_TYPES.ORIGIN;
 }
@@ -497,7 +522,7 @@ async function loadSelectedFile() {
 
   els.previewSummary.textContent = selectedProfileName;
   els.previewName.textContent = fileName;
-  els.previewEditor.value = content;
+  cmPreviewEditor.setValue(content);
   els.fetchSubscriptionButton.hidden = selectedFileType !== FILE_TYPES.ORIGIN || !profile?.url;
 
   if (userInfo && updateTime) {
@@ -556,7 +581,7 @@ async function saveOriginFile() {
   setStatus('Saving origin file');
   const result = await requestJson(`/api/profile/${encodeURIComponent(selectedProfileName)}/content`, {
     method: 'PUT',
-    body: JSON.stringify(els.previewEditor.value),
+    body: JSON.stringify(cmPreviewEditor.getValue()),
   });
   setStatus('Ready');
   notify(result.message || 'Origin file saved');
@@ -645,12 +670,12 @@ function bindEvents() {
   });
   els.saveRewriteButton.addEventListener('click', () => saveRewrite().catch((error) => notify(error.message, 'error')));
   els.copyRewriteButton.addEventListener('click', () => {
-    copyText(els.rewriteEditor.value)
+    copyText(cmRewriteEditor.getValue())
       .then(() => notify('Rewrite copied'))
       .catch((error) => notify(error.message, 'error'));
   });
   els.copyPreviewButton.addEventListener('click', () => {
-    copyText(els.previewEditor.value)
+    copyText(cmPreviewEditor.getValue())
       .then(() => notify('Preview copied'))
       .catch((error) => notify(error.message, 'error'));
   });
@@ -669,9 +694,9 @@ function bindEvents() {
   window.addEventListener('keydown', (e) => {
     if ((e.ctrlKey || e.metaKey) && e.key === 's') {
       e.preventDefault();
-      if (currentView === VIEWS.REWRITE && document.activeElement === els.rewriteEditor) {
+      if (currentView === VIEWS.REWRITE && cmRewriteEditor.hasFocus()) {
         saveRewrite().catch((error) => notify(error.message, 'error'));
-      } else if (currentView === VIEWS.FILES && selectedFileType === FILE_TYPES.ORIGIN && document.activeElement === els.previewEditor) {
+      } else if (currentView === VIEWS.FILES && selectedFileType === FILE_TYPES.ORIGIN && cmPreviewEditor.hasFocus()) {
         saveOriginFile().catch((error) => notify(error.message, 'error'));
       }
     }

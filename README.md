@@ -1,15 +1,14 @@
-# Clash Config Rewrite
+<p align="center">
+  <img src="docs/images/logo.png" width="200">
+</p>
 
-A small Fastify application for managing Clash profile files, fetching subscription profiles, and generating rewritten Clash YAML output through a user-provided JavaScript rewrite function.
+<h1 align="center">Clash Config Rewrite</h1>
 
-## Features
+<p align="center">
+  Manage, rewrite and distribute Clash subscription profiles.
+</p>
 
-- Manage Clash profiles through a web-based UI.
-- Fetch and automatically update subscription content from remote URLs.
-- Edit profile content directly in the browser.
-- Rewrite Clash configurations using custom JavaScript.
-- Generate both original and rewritten YAML outputs.
-- Download generated profiles through stable URLs.
+![Dashboard](docs/images/dashboard.png)
 
 ## Quick Start
 
@@ -89,7 +88,7 @@ function main(config, profileName) {
 
 The function may modify any part of the Clash configuration and must return a valid object.
 
-See [rewrite.example.js](./rewrite.example.js) for a complete example.
+See [rewrite.example.js](rewrite.example.js) for a complete example.
 
 When rewrite runs, the app writes:
 

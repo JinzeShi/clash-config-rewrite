@@ -6,7 +6,10 @@ RUN apk add --no-cache git && \
     git clone https://github.com/JinzeShi/clash-config-rewrite.git . && \
     rm -rf .git
 
-RUN npm ci && npm run build && npm prune --production
+RUN npm ci \
+    && npm run build \
+    && npm run copy-codemirror \
+    && npm prune --production
 
 EXPOSE 13000
 

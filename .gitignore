@@ -7,3 +7,5 @@ dist
 configs
 origin
 output
+
+public/vendor

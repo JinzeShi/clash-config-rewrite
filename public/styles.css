@@ -1,4 +1,4 @@
-:root {
+﻿:root {
   color-scheme: light;
   --bg: #f5f7f8;
   --panel: #ffffff;
@@ -73,14 +73,8 @@ button:hover {
 }
 
 button:focus,
-input:focus,
-textarea[readonly]:focus {
+input:focus {
   outline: none;
-}
-
-textarea:focus {
-  outline: 2px solid var(--focus);
-  outline-offset: 1px;
 }
 
 .app-shell {
@@ -328,8 +322,7 @@ input[readonly] {
   padding-right: 2px;
 }
 
-.file-panel,
-.editor-panel {
+.file-panel {
   min-width: 0;
   min-height: 0;
   display: grid;
@@ -338,6 +331,27 @@ input[readonly] {
   border-radius: 8px;
   background: var(--panel);
   overflow: hidden;
+}
+
+.editor-panel {
+  position: relative;
+  min-width: 0;
+  min-height: 0;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--panel);
+  overflow: hidden;
+}
+
+.editor-panel .panel-title {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 42px;
+  z-index: 1;
+  background: var(--panel);
+  border-radius: 8px 8px 0 0;
 }
 
 .compare-layout {
@@ -417,7 +431,6 @@ input[readonly] {
   font-weight: 500;
 }
 
-pre,
 textarea {
   width: 100%;
   height: 100%;
@@ -432,10 +445,6 @@ textarea {
   line-height: 1.55;
   tab-size: 2;
   white-space: pre;
-}
-
-pre {
-  padding: 12px;
 }
 
 textarea {
@@ -507,17 +516,9 @@ textarea {
 }
 
 .editor-area {
+  position: relative;
   min-height: 0;
-  display: flex;
-  flex-direction: column;
-  overflow: visible;
-}
-
-.editor-area pre,
-.editor-area textarea {
-  flex: 1;
-  min-height: 0;
-  height: 0;
+  overflow: hidden;
 }
 
 .mapping-header span {
@@ -645,4 +646,79 @@ textarea {
   display: flex;
   gap: 8px;
   justify-content: flex-end;
+}
+
+/* CodeMirror overwrite */
+.editor-area .CodeMirror {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: auto !important;
+}
+
+.editor-panel .CodeMirror {
+  position: absolute;
+  top: 42px;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: auto !important;
+}
+
+.editor-panel .CodeMirror,
+.compare-panel .CodeMirror {
+  border: 0;
+  font-family: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
+  font-size: 12px;
+  line-height: 1.55;
+  background: var(--code-bg);
+  color: var(--code-text);
+}
+
+.editor-panel .CodeMirror-gutters, .compare-panel .CodeMirror-gutters {
+  border-right: 1px solid var(--border);
+  background: #f8f9fb;
+}
+
+.editor-panel .CodeMirror-linenumber, .compare-panel .CodeMirror-linenumber {
+  color: var(--muted);
+}
+
+.editor-panel .CodeMirror-activeline-background {
+  background: rgba(43, 127, 255, 0.06);
+}
+
+.editor-panel .CodeMirror-cursor, .compare-panel .CodeMirror-cursor {
+  border-left-color: var(--focus);
+}
+
+.editor-panel .CodeMirror-focused, .compare-panel .cm-editable.CodeMirror-focused {
+  box-shadow: inset 0 1.5px 0 0 var(--focus);
+}
+
+.editor-panel .CodeMirror-focused .CodeMirror-selected, .compare-panel .CodeMirror-focused .CodeMirror-selected {
+  background: rgba(43, 127, 255, 0.18);
+}
+
+.editor-panel .CodeMirror-selected, .compare-panel .CodeMirror-selected {
+  background: rgba(181, 190, 200, 0.28);
+}
+
+.editor-panel .CodeMirror-scroll, .compare-panel .CodeMirror-scroll {
+  padding-bottom: 0;
+}
+
+.editor-panel .CodeMirror,
+.compare-panel .CodeMirror,
+.editor-panel .CodeMirror-scroll,
+.compare-panel .CodeMirror-scroll,
+.editor-panel .CodeMirror-sizer,
+.compare-panel .CodeMirror-sizer,
+.editor-panel .CodeMirror-lines,
+.compare-panel .CodeMirror-lines,
+.editor-panel .CodeMirror pre,
+.compare-panel .CodeMirror pre {
+  box-sizing: content-box;
 }
